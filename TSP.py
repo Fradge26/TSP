@@ -100,6 +100,10 @@ def update_score_from_dict(n1, n2, n3, n4, adj_dict):
     return - adj_dict[(n1, n2)] - adj_dict[(n3, n4)] + adj_dict[(n1, n3)] + adj_dict[(n2, n4)]
 
 
+def update_prime_score_from_dict(p, n, adj_dict):
+    return - adj_dict[(n[0], n[1])] * p[0] - adj_dict[(n[2], n[3])] * p[1] + adj_dict[(n[0], n[2])] * p[2] + adj_dict[(n[1], n[3])] * p[3]
+
+
 def cache_dist(n1, n2, n3, n4, adj_dict, ids2x, ids2y):
     if not (n1, n2) in adj_dict:
         adj_dict[(n1, n2)] = ((ids2x[n1] - ids2x[n2]) ** 2 + (ids2y[n1] - ids2y[n2]) ** 2) ** 0.5
@@ -272,14 +276,17 @@ def run_2opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
     i_indices = range(1, len(best_path) - 1)
     roll_i = 0
     adj_dict = {}
+    prime = dict(zip(path, [is_prime(p) for p in path]))
     while improvement:
         improvement = False
         for i in list(np.roll(i_indices, -roll_i)):
+            p1, p2 = prime(best_path[i - 1]), prime(best_path[i])
             for node, dist in n_dict[best_path[i]].items():
                 k = id2index[node]
-                n1, n2, n3, n4 = best_path[i - 1], best_path[i], best_path[k - 1], best_path[k]
-                cache_dist(n1, n2, n3, n4, adj_dict, ids2x, ids2y)
-                change = score_function(n1, n2, n3, n4, adj_dict)
+                n = [best_path[i - 1], best_path[i], best_path[k - 1], best_path[k]]
+                p = [p1, p2, prime(best_path[k - 1]), prime(best_path[k])]
+                cache_dist(n, adj_dict, ids2x, ids2y)
+                change = update_prime_score_from_dict(p, n, adj_dict)
                 if change < local_best_score - 0.0001:
                     local_best_score = change
                     best_i = i
