@@ -10,21 +10,13 @@ import itertools
 import datetime
 
 
-def calc_adjacency_dict(ids, x, y):
-    adj_dict = {}
-    for ind_i, i in enumerate(ids):
-        for ind_j, j in enumerate(ids):
-            adj_dict[(i, j)] = ((x[ind_i] - x[ind_j])**2 + (y[ind_i] - y[ind_j])**2) ** 0.5
-    return adj_dict
-
-
 def get_best_submission(sample_size):
     all_files = [f for f in os.listdir("./Submissions/") if os.path.isfile(os.path.join("./Submissions/", f))]
-    valid_files = [f.split("_") for f in all_files if int(f.split("_")[0]) == sample_size]
+    valid_files = sorted([int(f.split("_")[1].split(".")[0]) for f in all_files if f.split("_")[0] == str(sample_size)])
     if len(valid_files) == 0:
         return False
     else:
-        best_file = os.path.join("./Submissions/", "_".join(sorted(valid_files)[0]))
+        best_file = f"./Submissions/{sample_size}_{valid_files[0]}.csv"
         path = list(np.genfromtxt(best_file, delimiter=',', skip_header=True, dtype=int))
         return path
 
@@ -35,19 +27,20 @@ def write_submission(path, score):
     np.savetxt(f'Submissions/{sample_size}_{int(score)}.csv', path2, fmt='%s')
 
 
-def plot_path(path, score):
+def plot_path(sample_size, path, score, annotate):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     x = [ids2x[node] for node in path]
     y = [ids2y[node] for node in path]
-    line = Line2D(x, y)
+    line = Line2D(x, y, linewidth=0.2)
     ax.add_line(line)
     ax.set_xlim(min(x), max(x))
     ax.set_ylim(min(y), max(y))
-    # for i, label in enumerate(path):
-    #    ax.annotate(label, (ids2x[label], ids2y[label]), size=10)
-    plt.show()
-    fig.savefig(f'Figures/{score}.png', dpi=1000)
+    if annotate:
+        for i, label in enumerate(path):
+            ax.annotate(label, (ids2x[label], ids2y[label]), size=1)
+    # plt.show()
+    fig.savefig(f'Figures/{sample_size}_{int(score)}.png', dpi=1000)
 
 
 def split(a, n):
@@ -80,19 +73,7 @@ def get_score(path, ids2x, ids2y):
     return score
 
 
-def update_score(score, n1, n2, n3, n4, ids2x, ids2y):
-    score -= ((ids2x[n1] - ids2x[n2]) ** 2 + (ids2y[n1] - ids2y[n2]) ** 2) ** 0.5
-    score -= ((ids2x[n3] - ids2x[n4]) ** 2 + (ids2y[n3] - ids2y[n4]) ** 2) ** 0.5
-    score += ((ids2x[n1] - ids2x[n3]) ** 2 + (ids2y[n1] - ids2y[n3]) ** 2) ** 0.5
-    score += ((ids2x[n2] - ids2x[n4]) ** 2 + (ids2y[n2] - ids2y[n4]) ** 2) ** 0.5
-    return score
-
-
-def update_score_from_dict(score, adj_dict, n1, n2, n3, n4):
-    return score - adj_dict[(n1, n2)] - adj_dict[(n3, n4)] + adj_dict[(n1, n3)] + adj_dict[(n2, n4)]
-
-
-def get_score_prime(path):
+def get_score_prime(path, ids2x, ids2y):
     score = 0
     for i, a in enumerate(path[1:]):
         if ((i + 1) % 10 == 0) and not is_prime(a):
@@ -105,6 +86,29 @@ def get_score_prime(path):
         y2 = ids2y[path[i]]
         score += ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5 * penalty
     return score
+
+
+def update_score(score, n1, n2, n3, n4, ids2x, ids2y):
+    score -= ((ids2x[n1] - ids2x[n2]) ** 2 + (ids2y[n1] - ids2y[n2]) ** 2) ** 0.5
+    score -= ((ids2x[n3] - ids2x[n4]) ** 2 + (ids2y[n3] - ids2y[n4]) ** 2) ** 0.5
+    score += ((ids2x[n1] - ids2x[n3]) ** 2 + (ids2y[n1] - ids2y[n3]) ** 2) ** 0.5
+    score += ((ids2x[n2] - ids2x[n4]) ** 2 + (ids2y[n2] - ids2y[n4]) ** 2) ** 0.5
+    return score
+
+
+def update_score_from_dict(n1, n2, n3, n4, adj_dict):
+    return - adj_dict[(n1, n2)] - adj_dict[(n3, n4)] + adj_dict[(n1, n3)] + adj_dict[(n2, n4)]
+
+
+def cache_dist(n1, n2, n3, n4, adj_dict, ids2x, ids2y):
+    if not (n1, n2) in adj_dict:
+        adj_dict[(n1, n2)] = ((ids2x[n1] - ids2x[n2]) ** 2 + (ids2y[n1] - ids2y[n2]) ** 2) ** 0.5
+    if not (n3, n4) in adj_dict:
+        adj_dict[(n3, n4)] = ((ids2x[n3] - ids2x[n4]) ** 2 + (ids2y[n3] - ids2y[n4]) ** 2) ** 0.5
+    if not (n1, n3) in adj_dict:
+        adj_dict[(n1, n3)] = ((ids2x[n1] - ids2x[n3]) ** 2 + (ids2y[n1] - ids2y[n3]) ** 2) ** 0.5
+    if not (n2, n4) in adj_dict:
+        adj_dict[(n2, n4)] = ((ids2x[n2] - ids2x[n4]) ** 2 + (ids2y[n2] - ids2y[n4]) ** 2) ** 0.5
 
 
 def initial_path_from_nearest(ids, coords):
@@ -123,13 +127,14 @@ def initial_path_from_nearest(ids, coords):
                 path.append(node)
                 unvisited_nodes.remove(node)
                 break
-        if len(path) % 1000 == 0:
-            print(len(path))
     path.append(0)
     return path
 
 
 def find_crosses(path, score_func):
+    '''
+    obselete
+    '''
     def ccw(a, b, c):
         return (ids2y[c] - ids2y[a]) * (ids2x[b] - ids2x[a]) > (ids2y[b] - ids2y[a]) * (ids2x[c] - ids2x[a])
         # return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x)
@@ -152,7 +157,7 @@ def find_crosses(path, score_func):
                 if len(set((line1_node1, line1_node2, line2_node1, line2_node2))) == 4 and \
                         intersect(line1_node1, line1_node2, line2_node1, line2_node2):
                     # print(line1_node1, line1_node2, line2_node1, line2_node2)
-                    new_score = update_score(best_score, best_path[i-1], best_path[i], best_path[k-1], best_path[k])
+                    new_score = update_score(best_score, best_path[i - 1], best_path[i], best_path[k - 1], best_path[k])
                     if new_score < best_score:
                         best_score = new_score
                         best_path = swap_2opt(best_path, i, k)
@@ -185,7 +190,7 @@ def run_2opt(path, score_func):
         for i in range(1, len(best_path) - 1):
             # print(i)
             for k in range(i + 1, len(best_path) - 1):
-                new_score = update_score(best_score, best_path[i-1], best_path[i], best_path[k-1], best_path[k])
+                new_score = update_score(best_score, best_path[i - 1], best_path[i], best_path[k - 1], best_path[k])
                 if new_score < best_score - 0.001:
                     best_score = new_score
                     best_path = swap_2opt(best_path, i, k)
@@ -202,6 +207,9 @@ def run_2opt(path, score_func):
 
 
 def run_2opt_chunks(score_func, ids2x, ids2y, time_limit, path):
+    '''
+    obselete
+    '''
     now = datetime.datetime.now()
     adjacency_dict = calc_adjacency_dict(path, [ids2x[x] for x in path], [ids2y[y] for y in path])
     improvement = True
@@ -212,7 +220,8 @@ def run_2opt_chunks(score_func, ids2x, ids2y, time_limit, path):
         for i in range(1, len(best_path) - 1):
             for k in range(i + 1, len(best_path) - 1):
                 # new_score = update_score(best_score, best_path[i-1], best_path[i], best_path[k-1], best_path[k], ids2x, ids2y)
-                new_score = update_score_from_dict(best_score, adjacency_dict, best_path[i-1], best_path[i], best_path[k-1], best_path[k])
+                new_score = update_score_from_dict(best_score, adjacency_dict, best_path[i - 1], best_path[i],
+                                                   best_path[k - 1], best_path[k])
                 if new_score < best_score - 0.001:
                     best_score = new_score
                     best_path = swap_2opt(best_path, i, k)
@@ -243,11 +252,53 @@ def swap_2opt(route, i, k):
     return new_route
 
 
+def create_neighbours_dict(ids, coords, num):
+    neighbour_dict = {}
+    kdtree = spatial.KDTree(coords)
+    for i in ids:
+        neighbour_dict[i] = {}
+        closest_nodes = kdtree.query((ids2x[i], ids2y[i]), k=num)
+        for dist, node in zip(closest_nodes[0][1:], closest_nodes[1][1:]):
+            neighbour_dict[i][node] = dist
+    return neighbour_dict
+
+
+def run_2opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
+    start = datetime.datetime.now()
+    improvement = True
+    best_path = path
+    local_best_score = 0
+    id2index = dict(zip(best_path, range(len(best_path))))
+    i_indices = range(1, len(best_path) - 1)
+    roll_i = 0
+    adj_dict = {}
+    while improvement:
+        improvement = False
+        for i in list(np.roll(i_indices, -roll_i)):
+            for node, dist in n_dict[best_path[i]].items():
+                k = id2index[node]
+                n1, n2, n3, n4 = best_path[i - 1], best_path[i], best_path[k - 1], best_path[k]
+                cache_dist(n1, n2, n3, n4, adj_dict, ids2x, ids2y)
+                change = score_function(n1, n2, n3, n4, adj_dict)
+                if change < local_best_score - 0.0001:
+                    local_best_score = change
+                    best_i = i
+                    best_k = k
+                    improvement = True
+            if improvement:
+                best_path = swap_2opt(best_path, min(best_i, best_k), max(best_i, best_k))
+                id2index = dict(zip(best_path, range(len(best_path))))
+                local_best_score = 0
+                roll_i = best_i
+                break
+    assert len(best_path) == len(path)
+    return best_path, (datetime.datetime.now() - start)
+
+
 if __name__ == '__main__':
     plots = False
-    sample_size = int(197769/200)
-    threads = 1
-    time_limit = 60
+    annotate = False
+    sample_size = int(197769/197769*4999)  # 197769 total
 
     cities = np.genfromtxt('Inputs/cities.csv', delimiter=',', skip_header=True)
     sub_cities = cities[:sample_size, :]
@@ -255,16 +306,28 @@ if __name__ == '__main__':
     x = sub_cities[:, 1]
     y = sub_cities[:, 2]
     ids = list(map(int, sub_cities[:, 0]))
-    # adj_dict = calc_adjacency_dict(ids, x, y)
     ids2x = dict(zip(ids, x))
     ids2y = dict(zip(ids, y))
     init_path = get_best_submission(sample_size)
+    init_path = False
     if not init_path:
+        print("Creating initial path from nearest neighbours")
         init_path = initial_path_from_nearest(ids, coords)
-    init_score = get_score_prime(init_path)
-    write_submission(init_path, init_score)
+    init_score = get_score_prime(init_path, ids2x, ids2y)
     if plots:
-        plot_path(init_path, init_score)
+        plot_path(init_path, init_score, annotate)
+    print(f"Creating dictionary of close neighbours")
+    neighbours_dict = create_neighbours_dict(ids, coords, 25)
+    print(f"Initial score {init_score}")
+    print("Running 2-opt")
+    best_path, rt = run_2opt_n_dict(init_path, update_score_from_dict, neighbours_dict, ids2x, ids2y)
+    best_score = get_score_prime(best_path, ids2x, ids2y)
+    write_submission(best_path, best_score)
+    print(f"2-opt complete! Score:{best_score}, Time:{rt}")
+    if plots:
+        plot_path(sample_size, best_path, best_score, annotate)
+
+'''
     print(f"Initial score {init_score}")
     pool = Pool()
     score_func = get_score
@@ -274,3 +337,4 @@ if __name__ == '__main__':
     best_score = get_score_prime(best_path)
     write_submission(best_path, best_score)
     print(f"Best score {best_score}")
+'''
