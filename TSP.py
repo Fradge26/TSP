@@ -296,7 +296,7 @@ def run_2opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
 
 
 if __name__ == '__main__':
-    plots = False
+    plots = True
     annotate = False
     sample_size = int(197769/197769*4999)  # 197769 total
 
@@ -315,9 +315,9 @@ if __name__ == '__main__':
         init_path = initial_path_from_nearest(ids, coords)
     init_score = get_score_prime(init_path, ids2x, ids2y)
     if plots:
-        plot_path(init_path, init_score, annotate)
+        plot_path(sample_size, init_path, init_score, annotate)
     print(f"Creating dictionary of close neighbours")
-    neighbours_dict = create_neighbours_dict(ids, coords, 25)
+    neighbours_dict = create_neighbours_dict(ids, coords, 100)
     print(f"Initial score {init_score}")
     print("Running 2-opt")
     best_path, rt = run_2opt_n_dict(init_path, update_score_from_dict, neighbours_dict, ids2x, ids2y)
