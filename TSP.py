@@ -113,15 +113,15 @@ def cache_dist(n1, n2, n3, n4, adj_dict, ids2x, ids2y):
 
 def cache_edge_distances(adj_dict, ids2x, ids2y, path, edges):
     for e in edges:
-        if not (e[0], e[1]) in adj_dict:
+        if not (path[e[0]], path[e[1]]) in adj_dict:
             adj_dict[(path[e[0]], path[e[1]])] = ((ids2x[path[e[0]]] - ids2x[path[e[1]]]) ** 2 +
                                                   (ids2y[path[e[0]]] - ids2y[path[e[1]]]) ** 2) ** 0.5
 
 
-def cost_k_edges(adj_dict, route, edges):
+def cost_k_edges(adj_dict, path, edges):
     cost = 0
     for e in edges:
-        cost += adj_dict[(route[e[0]], route[e[1]])]
+        cost += adj_dict[(path[e[0]], path[e[1]])]
     return cost
 
 
@@ -321,7 +321,7 @@ def run_3opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
     best_path = path
     local_best_score = 0
     id2index = dict(zip(best_path, range(len(best_path))))
-    i_indices = range(1, len(best_path) - 1)
+    i_indices = range(1, len(best_path) - 6)
     roll_i = 0
     adj_dict = {}
     while improvement:
@@ -332,7 +332,7 @@ def run_3opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
                 for k_node, _ in n_dict[best_path[j]].items():
                     k = id2index[k_node]
                     i, j, k = sorted([i, j, k])
-                    if j - i == 1 or k - j == 1 or len(set((i, j, k))) != 3: continue
+                    if j - i == 1 or k - j == 1 or len({i, j, k}) != 3: continue
                     improvement = False
                     n1, n2, n3, n4, n5, n6 = i - 1, i, j - 1, j, k - 1, k
                     best_swap = [(n1, n2), (n3, n4), (n5, n6)]
@@ -377,7 +377,7 @@ def run_3opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
 if __name__ == '__main__':
     plots = False
     annotate = False
-    sample_size = int(197769 / 197769 * 499)  # 197769 total
+    sample_size = int(197769 / 197769 * 5000)  # 197769 total
 
     cities = np.genfromtxt('Inputs/cities.csv', delimiter=',', skip_header=True)
     sub_cities = cities[:sample_size, :]
@@ -396,8 +396,15 @@ if __name__ == '__main__':
     if plots:
         plot_path(sample_size, init_path, init_score, annotate)
     print(f"Creating dictionary of close neighbours")
-    neighbours_dict = create_neighbours_dict(ids, coords, 100)
+    neighbours_dict = create_neighbours_dict(ids, coords, 20)
     print(f"Initial score {init_score}")
+
+    print("Running 2-opt")
+    best_path, rt = run_2opt_n_dict(init_path, update_score_from_dict, neighbours_dict, ids2x, ids2y)
+    best_score = get_score_prime(best_path, ids2x, ids2y)
+    write_submission(best_path, best_score)
+    print(f"2-opt complete! Score:{best_score}, Time:{rt}")
+
     print("Running 3-opt")
     best_path, rt = run_3opt_n_dict(init_path, update_score_from_dict, neighbours_dict, ids2x, ids2y)
     best_score = get_score_prime(best_path, ids2x, ids2y)
