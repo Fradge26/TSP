@@ -315,15 +315,13 @@ def run_2opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
     return best_path, (datetime.datetime.now() - start)
 
 
-def run_3opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
+def run_3opt_n_dict(best_path, n_dict, ids2x, ids2y):
     start = datetime.datetime.now()
-    improvement = True
-    best_path = path
-    local_best_score = 0
     id2index = dict(zip(best_path, range(len(best_path))))
     i_indices = range(1, len(best_path) - 6)
     roll_i = 0
     adj_dict = {}
+    improvement = True
     while improvement:
         improvement = False
         for i in list(np.roll(i_indices, -roll_i)):
@@ -361,16 +359,15 @@ def run_3opt_n_dict(path, score_function, n_dict, ids2x, ids2y):
                         else:
                             s3 = -1
                         best_path = best_path[:best_swap[0][0] + 1] + \
-                                     best_path[best_swap[0][1]:best_swap[1][0] + s2:s2] + \
-                                     best_path[best_swap[1][1]:best_swap[2][0] + s3:s3] + \
-                                     best_path[best_swap[2][1]:]
+                                    best_path[best_swap[0][1]:best_swap[1][0] + s2:s2] + \
+                                    best_path[best_swap[1][1]:best_swap[2][0] + s3:s3] + \
+                                    best_path[best_swap[2][1]:]
                         roll_i = i
                         break
                 else:
                     continue
                 break
-
-    assert len(best_path) == len(path)
+    assert len(best_path) == len(best_path)
     return best_path, (datetime.datetime.now() - start)
 
 
@@ -406,7 +403,7 @@ if __name__ == '__main__':
     print(f"2-opt complete! Score:{best_score}, Time:{rt}")
 
     print("Running 3-opt")
-    best_path, rt = run_3opt_n_dict(init_path, update_score_from_dict, neighbours_dict, ids2x, ids2y)
+    best_path, rt = run_3opt_n_dict(ids, x, y, init_path=init_path, neighbour_limit=neighbours_dict)
     best_score = get_score_prime(best_path, ids2x, ids2y)
     write_submission(best_path, best_score)
     print(f"3-opt complete! Score:{best_score}, Time:{rt}")
