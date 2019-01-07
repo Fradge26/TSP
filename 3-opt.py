@@ -1,20 +1,12 @@
 import numpy as np
-import os
-from scipy import spatial
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-from copy import deepcopy
-from multiprocessing import Pool
-from functools import partial
-import itertools
-import datetime
+from scipy.spatial import cKDTree
 
 
 def create_neighbours_dict(ids, xs, ys, neighbour_limit):
     ids2x = dict(zip(ids, xs))
     ids2y = dict(zip(ids, ys))
     neighbour_dict = {}
-    kdtree = spatial.cKDTree([xs, ys])
+    kdtree = cKDTree([xs, ys])
     for i in ids:
         neighbour_dict[i] = {}
         closest_nodes = kdtree.query((ids2x[i], ids2y[i]), k=neighbour_limit)
