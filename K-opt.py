@@ -4,6 +4,7 @@ from random import sample
 import datetime
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from itertools import permutations
 
 
 def plot_path(path, annotate):
@@ -55,16 +56,17 @@ def create_neighbours_dict(ids, xs, ys, neighbour_limit):
     return neighbour_dict
 
 
-def close_neighbour_generator(i, best_path, n_dict, id2index):
-    for j_node, _ in n_dict[best_path[i]].items():
-        j = id2index[j_node]
-        if j <= i:
-            continue
-        for k_node, _ in n_dict[best_path[j]].items():
-            k = id2index[k_node]
-            if k <= j:
+def close_neighbour_generator(i, best_path, n_dict, id2index, depth, k):
+    if depth != 0:
+        for j_node, _ in n_dict[best_path[i]].items():
+            j = id2index[j_node]
+            if j <= i:
                 continue
-            yield j, k
+            k.append(j - 1)
+            k.append(j)
+            yield from close_neighbour_generator(j, best_path, n_dict, id2index, depth - 1, k)
+    else:
+        yield k
 
 
 def all_neighbour_generator(i, best_path, n_dict=None, id2index=None):
@@ -87,7 +89,20 @@ def cost_k_edges(adj_dict, path, edges):
     return cost
 
 
-def run_3opt(ids, xs, ys, neighbour_limit=None, path=None):
+def swap_generator(k):
+    def chunker(seq, size):
+        return [seq[pos:pos + size] for pos in range(0, len(seq), size)]
+
+    k = list(range(6))
+    for p in permutations(k[1:-1]):
+        for p2 in chunker(p, 2):
+            if abs(p2[0] - p2[1]) != 1:
+                break
+        else:
+            yield [(x[0], x[1]) for x in chunker([k[0]] + list(p) + [k[len(k) - 1]], 2)]
+
+
+def run_kopt(ids, xs, ys, neighbour_limit=None, path=None):
     ids2x = dict(zip(ids, xs))
     ids2y = dict(zip(ids, ys))
     if path is None:
@@ -108,10 +123,13 @@ def run_3opt(ids, xs, ys, neighbour_limit=None, path=None):
     while improved:
         improved = False
         for i in list(np.roll(i_indices, -roll_i)):
-            for j, k in neighbour_generator(i, path, n_dict, id2index):
+            for k in neighbour_generator(i, path, n_dict, id2index, 2, [i - 1, i]):
                 improved_i = False
-                n1, n2, n3, n4, n5, n6 = i - 1, i, j - 1, j, k - 1, k
-                best_swap = [(n1, n2), (n3, n4), (n5, n6)]
+                for swap in swap_generator(k):
+                    cache_edge_distances(adj_dict, ids2x, ids2y, path, swap)
+                    current_cost = cost_k_edges(adj_dict, path, best_swap)
+
+                best_swap = [(k[0], k[1]), (k[2], k[3]), (k[4], k[5])]
                 cache_edge_distances(adj_dict, ids2x, ids2y, path, best_swap)
                 current_cost = cost_k_edges(adj_dict, path, best_swap)
                 for sol in [[(n1, n2), (n3, n5), (n4, n6)],
@@ -180,12 +198,12 @@ if __name__ == '__main__':
     #print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
 
     start = datetime.datetime.now()
-    best_path = run_3opt(ids, xs, ys, neighbour_limit=20, path=path)
+    best_path = run_kopt(ids, xs, ys, neighbour_limit=20, path=path)
     print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
     plot_path(best_path, True)
 
     start = datetime.datetime.now()
-    best_path = run_3opt_2(ids, xs, ys, neighbour_limit=20, path=path)
+    best_path = run_kopt(ids, xs, ys, neighbour_limit=20, path=path)
     print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
     plot_path(best_path, True)
     pass
