@@ -21,7 +21,7 @@ def get_best_submission(sample_size):
         return path
 
 
-def write_submission(path, score):
+def write_submission(path, score, sample_size):
     path2 = deepcopy(path)
     path2.insert(0, 'path')
     np.savetxt(f'Submissions/{sample_size}_{int(score)}.csv', path2, fmt='%s')
@@ -38,7 +38,7 @@ def plot_path(sample_size, path, score, annotate):
     ax.set_ylim(min(y), max(y))
     if annotate:
         for i, label in enumerate(path):
-            ax.annotate(label, (ids2x[label], ids2y[label]), size=1)
+            ax.annotate(label, (ids2x[label], ids2y[label]), size=0.1)
     # plt.show()
     fig.savefig(f'Figures/{sample_size}_{int(score)}.png', dpi=1000)
 

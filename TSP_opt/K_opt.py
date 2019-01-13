@@ -1,9 +1,8 @@
 import numpy as np
 from scipy.spatial import cKDTree
 from random import sample
-import datetime
 from itertools import permutations
-from TSP_opt.helper_functions import plot_path, initial_path_from_nearest
+import TSP_opt.helper_functions
 
 
 def create_neighbours_dict(ids, xs, ys, neighbour_limit):
@@ -34,7 +33,6 @@ def close_neighbour_generator(i, best_path, n_dict, id2index, depth, k):
         for j_node, _ in n_dict[best_path[i]].items():
             j = id2index[j_node]
             if j > i:
-                # continue
                 yield from close_neighbour_generator(j, best_path, n_dict, id2index, depth - 1, k + [j - 1] + [j])
 
 
@@ -109,14 +107,16 @@ def run_kopt(ids, xs, ys, depth, neighbour_limit=None, path=None):
         n_dict = None
         neighbour_generator = all_neighbour_generator
     id2index = dict(zip(path, range(len(path))))
-    i_indices = range(1, len(path) - 6)
     roll_i = 0
     adj_dict = {}
     improved = True
     swap_dict = cache_swaps()
+    len_path = len(path)
+    shorter = 0
+    prev = 0
     while improved:
         improved = False
-        for i in list(np.roll(i_indices, -roll_i)):
+        for i in list(range(roll_i, len_path - 1)) + list(range(1, roll_i)):
             for k in neighbour_generator(i, path, n_dict, id2index, depth - 1, [i - 1, i]):
                 improved_i = False
                 for idx, swap in enumerate(swap_generator(k, swap_dict[int(len(k) / 2)])):
@@ -127,6 +127,7 @@ def run_kopt(ids, xs, ys, depth, neighbour_limit=None, path=None):
                     else:
                         swap_cost = cost_k_edges(adj_dict, path, swap)
                     if swap_cost < current_cost - 0.001:
+                        shorter += current_cost - swap_cost
                         best_swap = swap
                         current_cost = swap_cost
                         improved_i = True
@@ -135,34 +136,11 @@ def run_kopt(ids, xs, ys, depth, neighbour_limit=None, path=None):
                     # print(best_swap)
                     path = k_swap(best_swap, path)
                     id2index = dict(zip(path, range(len(path))))
-                    roll_i = i
+                    roll_i = i + 1
+                    if int(shorter / 100) > prev:
+                        prev = int(shorter / 100)
+                        score = TSP_opt.get_score(path,ids2x,ids2y)
+                        TSP_opt.write_submission(path, score, 197769)
                     break
     assert len(path) == len(path)
     return path
-
-
-if __name__ == '__main__':
-    nodes = 100
-    ids = list(range(nodes))
-    xs = np.random.randint(0, 10000, nodes, int)
-    ys = np.random.randint(0, 10000, nodes, int)
-    ids2x = dict(zip(ids, xs))
-    ids2y = dict(zip(ids, ys))
-
-    path = sample(ids[1:], len(ids) - 1)
-    path.insert(0, ids[0])
-    path.append(ids[0])
-    print(get_score(path, ids2x, ids2y))
-
-    path2 = initial_path_from_nearest(ids, xs, ys)
-    print(get_score(path2, ids2x, ids2y))
-
-    start = datetime.datetime.now()
-    best_path = run_kopt(ids, xs, ys, depth=3, neighbour_limit=20, path=path)
-    print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
-    plot_path(best_path, True)
-
-    start = datetime.datetime.now()
-    best_path = run_kopt(ids, xs, ys, neighbour_limit=20, path=path)
-    print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
-    plot_path(best_path, True)

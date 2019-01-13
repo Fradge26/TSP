@@ -2,6 +2,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from copy import copy
 
 
 def plot_path(path, ids2x, ids2y, annotate):
@@ -15,9 +16,24 @@ def plot_path(path, ids2x, ids2y, annotate):
     ax.set_ylim(min(y), max(y))
     if annotate:
         for i, label in enumerate(path):
-            ax.annotate(label, (ids2x[label], ids2y[label]), size=5)
+            ax.annotate(label, (ids2x[label], ids2y[label]), size=1)
     plt.show()
     #fig.savefig(f'Figures/{sample_size}_{int(score)}.png', dpi=1000)
+
+
+def save_path_plot(path, filename, ids2x, ids2y, annotate):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    x = [ids2x[node] for node in path]
+    y = [ids2y[node] for node in path]
+    line = Line2D(x, y, linewidth=0.2)
+    ax.add_line(line)
+    ax.set_xlim(min(x), max(x))
+    ax.set_ylim(min(y), max(y))
+    if annotate:
+        for i, label in enumerate(path):
+            ax.annotate(label, (ids2x[label], ids2y[label]), size=1)
+    fig.savefig(filename, dpi=1000)
 
 
 def initial_path_from_nearest(ids, xs, ys):
@@ -51,3 +67,9 @@ def get_score(path, ids2x, ids2y):
         y2 = ids2y[path[i]]
         score += ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
     return score
+
+
+def write_submission(path, score, sample_size):
+    path2 = copy(path)
+    path2.insert(0, 'path')
+    np.savetxt(f'Submissions/{sample_size}_{int(score)}.csv', path2, fmt='%s')
