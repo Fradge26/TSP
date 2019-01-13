@@ -2,47 +2,8 @@ import numpy as np
 from scipy.spatial import cKDTree
 from random import sample
 import datetime
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 from itertools import permutations
-
-
-def plot_path(path, ids2x, ids2y, annotate):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    x = [ids2x[node] for node in path]
-    y = [ids2y[node] for node in path]
-    line = Line2D(x, y, linewidth=0.2)
-    ax.add_line(line)
-    ax.set_xlim(min(x), max(x))
-    ax.set_ylim(min(y), max(y))
-    if annotate:
-        for i, label in enumerate(path):
-            ax.annotate(label, (ids2x[label], ids2y[label]), size=5)
-    plt.show()
-    #fig.savefig(f'Figures/{sample_size}_{int(score)}.png', dpi=1000)
-
-
-def initial_path_from_nearest(ids, xs, ys):
-    ids2x = dict(zip(ids, xs))
-    ids2y = dict(zip(ids, ys))
-    kdtree = cKDTree(np.column_stack((xs, ys)))
-    path = [0]
-    unvisited_nodes = set(ids)
-    unvisited_nodes.remove(0)
-    while unvisited_nodes:
-        for a in [4, 16, 100, 1000, 10000, 50000, 197000]:
-            closest_nodes = kdtree.query((ids2x[path[-1]], ids2y[path[-1]]), k=a)
-            overlap = set(closest_nodes[1]) & unvisited_nodes
-            if len(overlap) > 0:
-                break
-        for node in closest_nodes[1]:
-            if node in unvisited_nodes:
-                path.append(node)
-                unvisited_nodes.remove(node)
-                break
-    path.append(0)
-    return path
+from TSP_opt.helper_functions import plot_path, initial_path_from_nearest
 
 
 def create_neighbours_dict(ids, xs, ys, neighbour_limit):
@@ -75,18 +36,6 @@ def close_neighbour_generator(i, best_path, n_dict, id2index, depth, k):
             if j > i:
                 # continue
                 yield from close_neighbour_generator(j, best_path, n_dict, id2index, depth - 1, k + [j - 1] + [j])
-
-
-def gen(indeces, level):
-    if level == 0:
-        yield tuple(indeces)
-    else:
-        if indeces:
-            init = indeces[-1]
-        else:
-            init = x0
-        for i in range(init, init+delta):
-            yield from gen(indeces+[i], level-1)
 
 
 def all_neighbour_generator(i, best_path, n_dict=None, id2index=None):
@@ -128,15 +77,11 @@ def cache_swaps():
 
 
 def swap_generator(k, swap_set):
-    #def chunker(seq, size):
-    #    return [seq[pos:pos + size] for pos in range(0, len(seq), size)]
-
     for s in swap_set:
         output = []
         for i in range(0, len(k), 2):
             output.append((k[s[i]], k[s[i+1]]))
         yield output
-        # yield [(k[x[0]], k[x[1]]) for x in chunker([0] + list(s) + [len(k) - 1], 2)]
 
 
 def k_swap(swap, path):
@@ -196,17 +141,6 @@ def run_kopt(ids, xs, ys, depth, neighbour_limit=None, path=None):
     return path
 
 
-def get_score(path, ids2x, ids2y):
-    score = 0
-    for i, a in enumerate(path[1:]):
-        x1 = ids2x[path[i + 1]]
-        y1 = ids2y[path[i + 1]]
-        x2 = ids2x[path[i]]
-        y2 = ids2y[path[i]]
-        score += ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-    return score
-
-
 if __name__ == '__main__':
     nodes = 100
     ids = list(range(nodes))
@@ -223,10 +157,6 @@ if __name__ == '__main__':
     path2 = initial_path_from_nearest(ids, xs, ys)
     print(get_score(path2, ids2x, ids2y))
 
-    #start = datetime.datetime.now()
-    #best_path = run_3opt(ids, xs, ys, path=path)
-    #print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
-
     start = datetime.datetime.now()
     best_path = run_kopt(ids, xs, ys, depth=3, neighbour_limit=20, path=path)
     print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
@@ -236,4 +166,3 @@ if __name__ == '__main__':
     best_path = run_kopt(ids, xs, ys, neighbour_limit=20, path=path)
     print(get_score(best_path, ids2x, ids2y), datetime.datetime.now() - start)
     plot_path(best_path, True)
-    pass
